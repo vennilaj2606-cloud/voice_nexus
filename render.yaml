@@ -1,0 +1,86 @@
+# ==============================================================================
+# VoiceNexus AI – Render Blueprint Configuration (render.yaml)
+# Deploy PostgreSQL (pgvector), FastAPI Backend, and Next.js Frontend in 1 Click
+# Docs: https://render.com/docs/blueprint-spec
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. VoiceNexus AI Backend (FastAPI + WebSockets)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: voicenexus-backend
+    runtime: python
+    rootDir: backend
+    plan: starter # Use 'starter' for 24/7 telephony without sleep, or 'free'
+    region: oregon
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PROJECT_NAME
+        value: "VoiceNexus AI"
+      - key: API_V1_STR
+        value: "/api/v1"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: voicenexus-postgres
+          property: connectionString
+      - key: ALLOWED_ORIGINS
+        value: "https://voicenexus-frontend.onrender.com"
+
+      # AI & Voice Providers (Render will prompt you to enter these keys)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: "gpt-4o"
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_MODEL
+        value: "nova-2"
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        value: "21m00Tcm4TlvDq8ikWAM"
+      - key: TELNYX_API_KEY
+        sync: false
+      - key: TELNYX_PUBLIC_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+
+  # ----------------------------------------------------------------------------
+  # 2. VoiceNexus AI Frontend (Next.js 14 App Router)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: voicenexus-frontend
+    runtime: node
+    rootDir: frontend
+    plan: starter # Use 'starter' or 'free'
+    region: oregon
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18.20.0
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: "https://voicenexus-backend.onrender.com/api/v1"
+
+# ------------------------------------------------------------------------------
+# 3. PostgreSQL Database with pgvector Extension
+# ------------------------------------------------------------------------------
+databases:
+  - name: voicenexus-postgres
+    databaseName: voicenexus_db
+    user: voicenexus
+    plan: starter # 'starter' is persistent; Render free postgres expires in 30 days
+    region: oregon
+    postgresMajorVersion: "16"
