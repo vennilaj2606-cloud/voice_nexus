@@ -8,7 +8,7 @@ from app.core.logger import logger
 from app.database.init_db import init_db
 from app.api.deps import get_db
 
-from app.api.v1 import auth, leads, calls, properties, appointments, prompts, analytics, knowledge, webhooks
+from app.api.v1 import auth, leads, calls, properties, appointments, prompts, analytics, knowledge, webhooks, widget
 from app.websocket.call_stream_handler import CallStreamHandler
 from app.websocket.connection_manager import ws_manager
 
@@ -54,6 +54,7 @@ app.include_router(prompts.router, prefix=api_v1_prefix)
 app.include_router(analytics.router, prefix=api_v1_prefix)
 app.include_router(knowledge.router, prefix=api_v1_prefix)
 app.include_router(webhooks.router, prefix=api_v1_prefix)
+app.include_router(widget.router, prefix=api_v1_prefix)
 
 # WebSocket Endpoint for Telephony Audio Stream
 @app.websocket("/api/v1/ws/call/{call_id}")
