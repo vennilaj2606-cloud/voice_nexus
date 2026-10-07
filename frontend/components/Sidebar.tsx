@@ -20,7 +20,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Live Calls', href: '/live-calls', icon: Radio },
+  { name: 'Live Calls', href: '/livecalls', icon: Radio },
+  // { name: 'Live Calls', href: '/live-calls', icon: Radio },
   { name: 'Call History', href: '/calls', icon: PhoneCall },
   { name: 'Leads & CRM', href: '/leads', icon: Users },
   { name: 'Properties', href: '/properties', icon: Building2 },

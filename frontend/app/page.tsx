@@ -131,7 +131,7 @@ export default function DashboardPage() {
             </div>
 
             {/* AI Agent Status Panel */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6">
+            {/* <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6">
               <h2 className="font-semibold text-lg text-white">Active AI Voice Agent</h2>
               <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/20 space-y-3">
                 <div className="flex items-center space-x-3">
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                   <ArrowUpRight className="w-3.5 h-3.5 text-indigo-400" />
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
         </main>
       </div>

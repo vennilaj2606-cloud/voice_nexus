@@ -333,7 +333,7 @@ export default function KnowledgeBasePage() {
 
           {/* RAG Knowledge Retrieval Query Simulator */}
           <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-            <div>
+            {/* <div>
               <h2 className="font-semibold text-lg text-white flex items-center space-x-2">
                 <Sparkles className="w-5 h-5 text-indigo-400" />
                 <span>Test Vector Search Retrieval (RAG)</span>
@@ -341,9 +341,9 @@ export default function KnowledgeBasePage() {
               <p className="text-xs text-slate-400 mt-1">
                 Ask a question to test how your AI agent retrieves semantic chunks from your indexed knowledge base.
               </p>
-            </div>
+            </div> */}
 
-            <form onSubmit={handleTestQuery} className="flex space-x-3">
+            {/* <form onSubmit={handleTestQuery} className="flex space-x-3">
               <div className="flex-1 flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 focus-within:border-indigo-500">
                 <Search className="w-4 h-4 text-slate-400 shrink-0" />
                 <input
@@ -371,10 +371,10 @@ export default function KnowledgeBasePage() {
                   </>
                 )}
               </button>
-            </form>
+            </form> */}
 
             {/* Query Results Display */}
-            {queryResults !== null && (
+            {/* {queryResults !== null && (
               <div className="space-y-3 pt-2">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Retrieved Semantic Context ({queryResults.length} Chunks Found):
@@ -403,7 +403,7 @@ export default function KnowledgeBasePage() {
                   </div>
                 )}
               </div>
-            )}
+            )} */}
           </div>
         </main>
       </div>
