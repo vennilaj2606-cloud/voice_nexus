@@ -56,7 +56,7 @@ export default function Sidebar() {
           <PhoneCall className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="font-bold text-lg tracking-wide gradient-text">VoiceNexus AI</h1>
+          <h1 className="font-bold text-lg tracking-wide gradient-text">R4R AI</h1>
           <p className="text-xs text-slate-400">Enterprise Voice SaaS</p>
         </div>
       </div>
