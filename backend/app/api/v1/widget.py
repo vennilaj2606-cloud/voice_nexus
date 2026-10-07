@@ -60,9 +60,22 @@ async def widget_chat(chat_in: WidgetChatMessage, db: AsyncSession = Depends(get
     props_res = await db.execute(select(Property).filter(Property.status == "available"))
     properties = props_res.scalars().all()
 
-    lower = user_text.lower()
-    matched_props = []
+    from app.services.rag_service import RAGService
 
+    # 1. Search indexed Knowledge Base (policies, FAQs, guidelines, procedures)
+    kb_info = ""
+    if org_id:
+        try:
+            rag = RAGService(db, org_id)
+            kb_results = await rag.search_knowledge(user_text, top_k=2)
+            if kb_results and kb_results[0].get("similarity", 0) > 0.68:
+                top_content = kb_results[0].get("content", "").strip()
+                first_sent = top_content.split(".")[0] + "." if "." in top_content else top_content[:150]
+                kb_info = f"Regarding our company policy, {first_sent}"
+        except Exception:
+            pass
+
+    # 2. Check for dynamic property information
     for p in properties:
         if (p.title.lower() in lower or lower in p.title.lower() or 
             p.address.lower().split(",")[0].strip() in lower):
@@ -78,19 +91,25 @@ async def widget_chat(chat_in: WidgetChatMessage, db: AsyncSession = Depends(get
 
     if matched_props:
         p = matched_props[0]
-        reply = (
-            f"{p['title']} is located at {p['address']}. "
-            f"It features {p['bedrooms']} bedrooms, {p['bathrooms']} bathrooms, "
-            f"and is priced at ${p['price']:,.0f}. {p['description']}"
+        prop_text = (
+            f"{p['title']} is located at {p['address']}, featuring "
+            f"{p['bedrooms']} bedrooms, {p['bathrooms']} bathrooms, "
+            f"and is offered at ${p['price']:,.0f}. {p['description']}"
         )
+        if kb_info:
+            reply = f"{kb_info} As for this listing, {prop_text} Would you like me to book a private viewing tour for you?"
+        else:
+            reply = f"{prop_text} Would you like me to schedule a viewing for you?"
         return WidgetChatResponse(reply=reply, action="search_property", properties=matched_props)
 
     if any(k in lower for k in ["bed", "room", "bath"]):
         if properties:
             specs = "; ".join([f"{p.title} ({p.bedrooms} beds, {p.bathrooms} baths)" for p in properties[:3]])
-            reply = f"Here are available bedroom specifications from our live listings: {specs}. Would you like details on one of these?"
+            reply = f"We have several residences available with varying floor plans: {specs}. Would you like more details on any of these?"
         else:
-            reply = "We have multiple properties in our portfolio. How many bedrooms are you seeking?"
+            reply = "We have multiple residences in our collection. How many bedrooms are you looking for?"
+        if kb_info:
+            reply = f"{kb_info} In addition, {reply}"
         return WidgetChatResponse(reply=reply, action="bedroom_inquiry")
 
     if any(k in lower for k in ["book", "appointment", "schedule", "tour", "viewing", "visit"]):
@@ -110,20 +129,29 @@ async def widget_chat(chat_in: WidgetChatMessage, db: AsyncSession = Depends(get
                 await db.commit()
             except Exception:
                 pass
-        reply = "I have booked a private viewing appointment for you tomorrow at 2:00 PM and saved your details in our CRM system!"
+        reply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot."
+        if kb_info:
+            reply = f"{kb_info} Also, {reply}"
         return WidgetChatResponse(reply=reply, action="book_appointment")
 
     if any(k in lower for k in ["buy", "price", "cost", "available", "house", "property", "list"]):
         if properties:
             featured = ", ".join([f"'{p.title}' (${p.price:,.0f})" for p in properties[:3]])
-            reply = f"I queried our database. Featured listings: {featured}. Would you like me to schedule a viewing for you?"
+            reply = f"Our current featured residences include {featured}. Would you like me to schedule a viewing for you?"
         else:
-            reply = "I searched our live property database. How can I assist you with your budget or location preference?"
+            reply = "We have several properties available. How can I assist with your budget or preferred neighborhood?"
+        if kb_info:
+            reply = f"{kb_info} In addition, {reply}"
         return WidgetChatResponse(reply=reply, action="search_properties")
 
-    # Conversational fallback
+    # If only policy / guidelines matched
+    if kb_info:
+        reply = f"{kb_info} Please let me know if you would like more details or if you would like to schedule a private viewing."
+        return WidgetChatResponse(reply=reply, action="knowledge_policy")
+
+    # Conversational fallback (completely natural, no technical jargon)
     reply = (
-        f"Thank you for saying '{user_text}'. "
-        "I can search available properties, check specs and pricing, or book a private viewing for you right now."
+        f"Thank you for asking about '{user_text}'. "
+        "I can help you explore available residences, check pricing and floor plans, answer policy questions, or arrange a private viewing. How may I best assist you?"
     )
     return WidgetChatResponse(reply=reply)

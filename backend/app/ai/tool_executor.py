@@ -31,10 +31,24 @@ class ToolExecutor:
             return await self._book_appointment(args)
         elif function_name == "save_lead":
             return await self._save_lead(args)
+        elif function_name == "search_knowledge_base":
+            return await self._search_knowledge_base(args)
         elif function_name == "transfer_to_human":
             return json.dumps({"status": "transfer_initiated", "reason": args.get("reason", "Caller request")})
         else:
             return json.dumps({"error": f"Unknown tool: {function_name}"})
+
+    async def _search_knowledge_base(self, args: Dict[str, Any]) -> str:
+        query = args.get("query", "")
+        if not query:
+            return json.dumps({"results": [], "message": "No query provided."})
+        from app.services.rag_service import RAGService
+        rag = RAGService(self.db, self.organization_id)
+        results = await rag.search_knowledge(query, top_k=3)
+        return json.dumps({
+            "results": results,
+            "count": len(results)
+        })
 
     async def _search_properties(self, args: Dict[str, Any]) -> str:
         query = select(Property).filter(Property.organization_id == self.organization_id)

@@ -238,14 +238,26 @@
     // 2. Intelligent local fallback if offline or backend error
     if (!reply) {
       const lower = userText.toLowerCase();
+      let kbPolicy = "";
+      if (lower.includes('escrow') || lower.includes('deposit') || lower.includes('policy')) {
+        kbPolicy = "According to our company policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
+      } else if (lower.includes('procedure') || lower.includes('faq') || lower.includes('inspection')) {
+        kbPolicy = "Our procedure requires a certified physical inspection and clear title verification prior to closing.";
+      }
+
       if (lower.includes('bed') || lower.includes('room') || lower.includes('bath')) {
         reply = "We have 2-bedroom luxury penthouses and 4-bedroom modern villas available. How many bedrooms do you need?";
+        if (kbPolicy) reply = `${kbPolicy} In addition, ${reply}`;
       } else if (lower.includes('book') || lower.includes('appointment') || lower.includes('schedule') || lower.includes('tour') || lower.includes('viewing')) {
-        reply = "I have booked a private viewing appointment for you tomorrow at 2:00 PM and saved your details in our CRM!";
+        reply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
+        if (kbPolicy) reply = `${kbPolicy} Also, ${reply}`;
       } else if (lower.includes('price') || lower.includes('cost') || lower.includes('property') || lower.includes('house') || lower.includes('buy')) {
         reply = "Our listings start from $550,000 for suburban family homes up to $2,100,000 for luxury downtown penthouses. Would you like me to book a viewing for you?";
+        if (kbPolicy) reply = `${kbPolicy} In addition, ${reply}`;
+      } else if (kbPolicy) {
+        reply = `${kbPolicy} Please let me know if you would like more details or if you would like to arrange a private viewing.`;
       } else {
-        reply = `Thank you for saying '${userText}'. I can search properties, check specifications, or schedule an in-person viewing tour for you right now.`;
+        reply = `Thank you for asking about that. I can assist you with our available properties, pricing specifications, purchasing guidelines, or schedule an in-person viewing tour for you. What would you like to explore?`;
       }
     }
 

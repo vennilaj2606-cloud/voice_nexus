@@ -22,43 +22,66 @@ class GPT4ConversationEngine:
         """Add user message, handle potential tool execution, and yield assistant response text chunks."""
         self.memory.add_user_message(user_transcript)
 
-        # Fallback for dev / mock mode if API key is mock: Execute real 2-way database queries and mutations
+        # Fallback / offline mode: Execute real 2-way knowledge base search, property search, and actions
         if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "sk-proj-mock-key-for-development":
             txt_lower = user_transcript.lower()
 
-            if any(k in txt_lower for k in ["house", "property", "buy", "price", "bedroom", "looking for", "search", "list"]):
+            # 1. Search knowledge base for policies, FAQs, guidelines, or procedures
+            kb_summary = ""
+            kb_res_text = await self.executor.execute_tool("search_knowledge_base", json.dumps({"query": user_transcript}))
+            try:
+                kb_data = json.loads(kb_res_text)
+                kb_results = kb_data.get("results", [])
+                if kb_results and kb_results[0].get("similarity", 0) > 0.65:
+                    top_chunk = kb_results[0].get("content", "").strip()
+                    # Clean chunk into short sentence
+                    first_sentence = top_chunk.split(".")[0] + "." if "." in top_chunk else top_chunk[:160] + "..."
+                    kb_summary = f"According to our company policy, {first_sentence}"
+            except Exception:
+                pass
+
+            # 2. Check for dynamic property information
+            has_property_intent = any(k in txt_lower for k in ["house", "property", "buy", "price", "bedroom", "looking for", "search", "list", "villa", "penthouse", "cost"])
+            prop_summary = ""
+
+            if has_property_intent:
                 tool_res_text = await self.executor.execute_tool("search_properties", json.dumps({"query": user_transcript}))
                 try:
                     res_data = json.loads(tool_res_text)
                     results = res_data.get("results", [])
                     if results:
                         items_str = ", ".join([f"'{p['title']}' at {p['address']} (${p['price']:,.0f})" for p in results[:2]])
-                        mock_resp = f"I queried our live database in real time. We have {items_str}. Would you like me to book a viewing appointment for you?"
+                        prop_summary = f"We currently have {items_str} available"
                     else:
-                        mock_resp = "I searched our live property database, but couldn't find an exact match right now. Would you like me to save your contact details so we can alert you when a listing arrives?"
+                        prop_summary = "We do not have an exact property match currently available, but our team can notify you as soon as one arrives"
                 except Exception:
-                    mock_resp = "I queried our live database. How else can I assist you with our available listings?"
+                    pass
 
-            elif any(k in txt_lower for k in ["book", "appointment", "schedule", "viewing", "tour", "meet"]):
-                tool_res_text = await self.executor.execute_tool("book_appointment", json.dumps({
+            # 3. Combine both sources or return the most relevant answer
+            if kb_summary and prop_summary:
+                mock_resp = f"{kb_summary} In addition, {prop_summary}. Would you like me to schedule a private viewing for you?"
+            elif kb_summary:
+                mock_resp = f"{kb_summary} Please let me know if you would like more details or if you would like to schedule an agent consultation."
+            elif prop_summary:
+                mock_resp = f"{prop_summary}. Would you like me to book a private viewing tour for you?"
+            elif any(k in txt_lower for k in ["book", "appointment", "schedule", "viewing", "tour", "meet", "visit"]):
+                await self.executor.execute_tool("book_appointment", json.dumps({
                     "customer_name": "Caller",
                     "customer_phone": "+15550192834",
                     "start_time": "2026-10-05T14:00:00",
                     "title": "Property Viewing Appointment",
                     "notes": f"Requested during live call: {user_transcript}"
                 }))
-                mock_resp = "I have written this update directly into our live system! Your appointment has been booked in the database for tomorrow at 2:00 PM and saved to your lead record."
-
+                mock_resp = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot."
             elif any(k in txt_lower for k in ["lead", "contact", "my name is", "email", "phone", "number", "save"]):
-                tool_res_text = await self.executor.execute_tool("save_lead", json.dumps({
+                await self.executor.execute_tool("save_lead", json.dumps({
                     "name": "Live Caller",
                     "phone": "+15550192834",
                     "notes": user_transcript
                 }))
-                mock_resp = "I have updated our live CRM database with your contact information and notes from this call."
-
+                mock_resp = "Thank you! I have updated your contact details and preferences in our client records."
             else:
-                mock_resp = f"Thank you for saying '{user_transcript}'. Every statement in this call is being logged to our real-time database. I can search properties, check availability, or schedule appointments for you right now."
+                mock_resp = f"Thank you for asking about that. I can assist you with our available properties, pricing specifications, company policies, or schedule an in-person viewing tour for you. What would you like to explore?"
 
             self.memory.add_assistant_message(mock_resp)
             yield mock_resp

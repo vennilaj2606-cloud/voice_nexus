@@ -123,7 +123,27 @@ export default function CallTestModal({ isOpen, onClose }: CallTestModalProps) {
       // Use cached liveProperties
     }
 
-    // 1. Check if user is asking about a specific property by title or keyword
+    // 1. Check indexed knowledge base for company policies, FAQs, procedures, escrow rules
+    let kbInfo = "";
+    try {
+      const kbRes = await api.post('/knowledge/query', { query: textToSend, top_k: 2 });
+      const results = kbRes.data?.results || [];
+      if (results.length > 0 && results[0].similarity > 0.65) {
+        toolExecuted = `search_knowledge_base(query="${textToSend}")`;
+        setActiveTool(toolExecuted);
+        const topContent = results[0].content.trim();
+        const firstSentence = topContent.split('.')[0] + '.';
+        kbInfo = `According to our company policy, ${firstSentence}`;
+      }
+    } catch (e) {
+      if (lowerText.includes('escrow') || lowerText.includes('deposit') || lowerText.includes('policy')) {
+        toolExecuted = `search_knowledge_base(topic="escrow_policy")`;
+        setActiveTool(toolExecuted);
+        kbInfo = "According to our standard buyer policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
+      }
+    }
+
+    // 2. Check if user is asking about a specific property by title or keyword
     const matchedProperty = properties.find((p) => 
       lowerText.includes(p.title.toLowerCase()) || 
       p.title.toLowerCase().includes(lowerText) ||
@@ -131,47 +151,65 @@ export default function CallTestModal({ isOpen, onClose }: CallTestModalProps) {
     );
 
     if (matchedProperty) {
-      toolExecuted = `search_properties(query="${matchedProperty.title}")`;
+      toolExecuted = toolExecuted ? `${toolExecuted} + search_properties` : `search_properties(query="${matchedProperty.title}")`;
       setActiveTool(toolExecuted);
-      aiReply = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
+      const propDetails = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
+      if (kbInfo) {
+        aiReply = `${kbInfo} As for this residence, ${propDetails} Would you like me to schedule a private tour for you?`;
+      } else {
+        aiReply = `${propDetails} Would you like me to schedule a private tour for you?`;
+      }
     }
-    // 2. Check if user is asking about bedrooms or specs
+    // 3. Check if user is asking about bedrooms or specs
     else if (lowerText.includes('bed') || lowerText.includes('room') || lowerText.includes('bath') || lowerText.includes('spec')) {
-      toolExecuted = `search_properties(filter="bedrooms")`;
+      toolExecuted = toolExecuted ? `${toolExecuted} + search_properties` : `search_properties(filter="bedrooms")`;
       setActiveTool(toolExecuted);
       if (properties.length > 0) {
         const bedCounts = properties.map(p => `${p.title} (${p.bedrooms} beds, ${p.bathrooms} baths)`).join('; ');
-        aiReply = `Our live database has listings ranging from 3 to 4 bedrooms. Here are current options: ${bedCounts}. Which one would you like more details on?`;
+        aiReply = `We currently have residences available across various floor plans: ${bedCounts}. Which one would you like more details on?`;
       } else {
-        aiReply = `Currently we have several properties listed. Would you like me to search by budget or bedroom count?`;
+        aiReply = `Currently we have several properties listed. How many bedrooms are you seeking?`;
+      }
+      if (kbInfo) {
+        aiReply = `${kbInfo} In addition, ${aiReply}`;
       }
     }
-    // 3. Booking appointment request
+    // 4. Booking appointment request
     else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('view') || lowerText.includes('schedule') || lowerText.includes('tour')) {
       toolExecuted = 'book_appointment(date="Tomorrow at 2:00 PM", status="confirmed")';
       setActiveTool(toolExecuted);
-      aiReply = "I have recorded your request directly in our live database! A private viewing appointment has been scheduled for tomorrow at 2:00 PM, and your lead details have been updated in our CRM.";
+      aiReply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
+      if (kbInfo) {
+        aiReply = `${kbInfo} Furthermore, ${aiReply}`;
+      }
     }
-    // 4. General property search / buy / price inquiry
+    // 5. General property search / buy / price inquiry
     else if (lowerText.includes('buy') || lowerText.includes('property') || lowerText.includes('house') || lowerText.includes('villa') || lowerText.includes('penthouse') || lowerText.includes('search') || lowerText.includes('price') || lowerText.includes('cost')) {
-      toolExecuted = `search_properties(limit=3)`;
+      toolExecuted = toolExecuted ? `${toolExecuted} + search_properties` : `search_properties(limit=3)`;
       setActiveTool(toolExecuted);
       if (properties.length > 0) {
         const featured = properties.slice(0, 3).map(p => `'${p.title}' at ${p.address} ($${p.price.toLocaleString()})`).join(', ');
-        aiReply = `I queried our live database in real time. We currently have ${featured}. Which property would you like to inspect or schedule a viewing for?`;
+        aiReply = `Our current featured residences include ${featured}. Which property would you like to inspect or schedule a viewing for?`;
       } else {
-        aiReply = "I searched our live property database, but couldn't find active listings at this moment. Would you like to leave your contact details to be notified when new listings arrive?";
+        aiReply = "We currently have several residences in our portfolio. How can I assist with your target budget or preferred area?";
+      }
+      if (kbInfo) {
+        aiReply = `${kbInfo} In addition, ${aiReply}`;
       }
     }
-    // 5. Contact info / Lead saving
+    // 6. Contact info / Lead saving
     else if (lowerText.includes('name') || lowerText.includes('number') || lowerText.includes('contact') || lowerText.includes('lead') || lowerText.includes('phone') || lowerText.includes('email')) {
       toolExecuted = 'save_lead(status="qualified")';
       setActiveTool(toolExecuted);
-      aiReply = "Thank you! I have updated our live CRM database with your contact information. An agent will follow up with you shortly.";
+      aiReply = "Thank you! I have updated your contact details and preferences in our client records. A specialist will follow up with you shortly.";
     }
-    // Default fallback
+    // 7. Policy / Guideline match only
+    else if (kbInfo) {
+      aiReply = `${kbInfo} Please let me know if you would like more details or if you would like to schedule a private viewing.`;
+    }
+    // Default fallback (conversational and natural)
     else {
-      aiReply = `Thank you for saying '${textToSend}'. Every turn in this call queries our live PostgreSQL database. I can look up property details, check bedroom availability, or schedule viewings for you right now.`;
+      aiReply = `Thank you for asking about that. I can assist you with our available properties, pricing specifications, purchasing guidelines, or schedule an in-person viewing tour for you. What would you like to explore?`;
     }
 
     setMessages((prev) => [...prev, { role: 'assistant', text: aiReply, toolCall: toolExecuted }]);

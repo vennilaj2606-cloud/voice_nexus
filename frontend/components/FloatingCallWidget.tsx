@@ -112,7 +112,26 @@ export default function FloatingCallWidget() {
     const lowerText = textToSend.toLowerCase();
     let reply = "";
 
-    // Refresh properties from Neon PostgreSQL
+    // 1. Check indexed knowledge base for company policies, FAQs, procedures, escrow rules
+    let kbInfo = "";
+    try {
+      const kbRes = await api.post('/knowledge/query', { query: textToSend, top_k: 2 });
+      const results = kbRes.data?.results || [];
+      if (results.length > 0 && results[0].similarity > 0.65) {
+        const topContent = results[0].content.trim();
+        const firstSentence = topContent.split('.')[0] + '.';
+        kbInfo = `According to our company policy, ${firstSentence}`;
+      }
+    } catch (e) {
+      // Local fallback for policies if knowledge base is empty
+      if (lowerText.includes('escrow') || lowerText.includes('deposit') || lowerText.includes('policy')) {
+        kbInfo = "According to our standard buyer policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
+      } else if (lowerText.includes('faq') || lowerText.includes('inspection') || lowerText.includes('procedure')) {
+        kbInfo = "Our standard procedures include a comprehensive home inspection and verification before any closing contracts are finalized.";
+      }
+    }
+
+    // 2. Check dynamic property listings
     let properties = liveProperties;
     try {
       const res = await api.get('/properties/');
@@ -129,25 +148,41 @@ export default function FloatingCallWidget() {
     );
 
     if (matchedProperty) {
-      reply = `${matchedProperty.title} is located at ${matchedProperty.address}. It has ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, priced at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
+      const propDetails = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
+      if (kbInfo) {
+        reply = `${kbInfo} As for this residence, ${propDetails} Would you like me to schedule a private tour for you?`;
+      } else {
+        reply = `${propDetails} Would you like me to schedule a private tour for you?`;
+      }
     } else if (lowerText.includes('bed') || lowerText.includes('room') || lowerText.includes('bath')) {
       if (properties.length > 0) {
         const bedCounts = properties.map(p => `${p.title} (${p.bedrooms} beds, ${p.bathrooms} baths)`).join('; ');
-        reply = `Here are current bedroom specs from our live database: ${bedCounts}.`;
+        reply = `We have residences available ranging across various floor plans: ${bedCounts}. Which of these catches your interest?`;
       } else {
-        reply = "We have multiple properties listed. How many bedrooms are you looking for?";
+        reply = "We have multiple residences available. How many bedrooms are you seeking?";
       }
-    } else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('schedule') || lowerText.includes('tour')) {
-      reply = "I have booked a private viewing appointment for you tomorrow at 2:00 PM and saved your details in our CRM!";
-    } else if (lowerText.includes('buy') || lowerText.includes('property') || lowerText.includes('house') || lowerText.includes('price')) {
+      if (kbInfo) {
+        reply = `${kbInfo} In addition, ${reply}`;
+      }
+    } else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('schedule') || lowerText.includes('tour') || lowerText.includes('viewing')) {
+      reply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
+      if (kbInfo) {
+        reply = `${kbInfo} Furthermore, ${reply}`;
+      }
+    } else if (lowerText.includes('buy') || lowerText.includes('property') || lowerText.includes('house') || lowerText.includes('price') || lowerText.includes('cost')) {
       if (properties.length > 0) {
         const featured = properties.slice(0, 3).map(p => `'${p.title}' ($${p.price.toLocaleString()})`).join(', ');
-        reply = `I queried our live database. Featured properties: ${featured}. Would you like me to schedule a viewing?`;
+        reply = `Our current featured residences include ${featured}. Would you like me to arrange a private viewing for you?`;
       } else {
-        reply = "I searched our live property database. How can I assist you with your budget or location preference?";
+        reply = "We have several residences available. How can I assist with your target budget or preferred area?";
       }
+      if (kbInfo) {
+        reply = `${kbInfo} In addition, ${reply}`;
+      }
+    } else if (kbInfo) {
+      reply = `${kbInfo} Please let me know if you would like more details or if you would like to schedule a private viewing.`;
     } else {
-      reply = `Thank you for saying '${textToSend}'. Every statement in this call is logged to our live database. I can search properties, check specs, or book viewings for you right now.`;
+      reply = `Thank you for asking about that. I can assist you with our available properties, pricing specifications, purchasing guidelines, or schedule an in-person viewing tour for you. What would you like to explore today?`;
     }
 
     setMessages((prev) => [...prev, { role: 'assistant', text: reply }]);

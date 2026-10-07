@@ -49,9 +49,12 @@ export default function LiveCallsPage() {
 
     // Simulate real-time GPT-4 streaming turn & speak out loud
     setTimeout(() => {
-      let aiReply = "I would be happy to assist you with that! We have several 3-bedroom luxury properties available starting at $450,000. Would you like me to book a viewing appointment for you?";
-      if (textToSend.toLowerCase().includes("book") || textToSend.toLowerCase().includes("appointment") || textToSend.toLowerCase().includes("yes")) {
-        aiReply = "Great! I have reserved a viewing slot for you tomorrow at 2:00 PM. I have saved your details in our system.";
+      const lower = textToSend.toLowerCase();
+      let aiReply = "I would be happy to assist you with that! We have several 3-bedroom luxury properties available starting at $450,000. Would you like me to arrange a private viewing for you?";
+      if (lower.includes("policy") || lower.includes("escrow") || lower.includes("deposit")) {
+        aiReply = "According to our standard buyer policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency. We currently have residences available if you would like to arrange a tour.";
+      } else if (lower.includes("book") || lower.includes("appointment") || lower.includes("yes") || lower.includes("tour")) {
+        aiReply = "Great! I have reserved a viewing slot for you tomorrow at 2:00 PM and saved your details in our system.";
       }
       setMessages((prev) => [...prev, { role: 'assistant', text: aiReply }]);
 

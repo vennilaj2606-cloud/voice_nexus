@@ -69,6 +69,20 @@ AI_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "search_knowledge_base",
+            "description": "Search indexed business knowledge base and uploaded documents for company policies, FAQs, escrow procedures, closing guidelines, and static business information.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query regarding company policies, FAQs, or guidelines"}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "transfer_to_human",
             "description": "Transfer the caller to a live human agent specialist.",
             "parameters": {
