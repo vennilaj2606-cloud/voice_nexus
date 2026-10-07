@@ -877,7 +877,7 @@
             </div>
 
             <div class="vn-branding">
-              Powered by <strong>VoiceNexus AI</strong>
+              Powered by <strong>R4R Technologies</strong>
             </div>
           </div>
         `

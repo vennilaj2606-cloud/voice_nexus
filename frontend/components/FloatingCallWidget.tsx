@@ -314,7 +314,7 @@ export default function FloatingCallWidget() {
                 </div>
 
                 <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-800/80 w-full">
-                  Powered by <strong className="text-slate-400">VoiceNexus AI</strong>
+                  Powered by <strong className="text-slate-400">R4R Technologies</strong>
                 </div>
               </div>
             )}
