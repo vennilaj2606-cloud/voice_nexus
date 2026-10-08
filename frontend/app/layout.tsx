@@ -4,7 +4,7 @@ import './globals.css';
 import FloatingCallWidget from '@/components/FloatingCallWidget';
 
 export const metadata: Metadata = {
-  title: 'VoiceNexus AI – Enterprise Voice AI SaaS Platform',
+  title: 'R4R AI – Enterprise Voice AI SaaS Platform',
   description: 'Production-Ready Voice AI Assistant Platform for Telephony, Customer Support, and Lead Generation.',
 };
 

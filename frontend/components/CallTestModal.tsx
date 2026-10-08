@@ -80,7 +80,7 @@ export default function CallTestModal({ isOpen, onClose }: CallTestModalProps) {
   const startCallSession = () => {
     setIsCalling(true);
     setActiveTool(null);
-    const greeting = "Hello! Thank you for calling VoiceNexus Real Estate. My name is Nexus. How can I assist you with our available properties or schedule a viewing today?";
+    const greeting = "Hello! Thank you for calling Apex Realty. My name is Priya, your R4R AI Advisor. How can I assist you with our available properties, company guidelines, or schedule a viewing today?";
     setMessages([
       {
         role: 'assistant',
@@ -107,109 +107,63 @@ export default function CallTestModal({ isOpen, onClose }: CallTestModalProps) {
 
     setMessages((prev) => [...prev, { role: 'user', text: textToSend }]);
     setInputSpeech('');
-    setLatency(`${Math.floor(250 + Math.random() * 110)}ms`);
+    setLatency(`${Math.floor(240 + Math.random() * 90)}ms`);
 
-    const lowerText = textToSend.toLowerCase();
     let aiReply = "";
     let toolExecuted: string | undefined = undefined;
 
-    // Refresh properties from Neon PostgreSQL to ensure latest database state
-    let properties = liveProperties;
     try {
-      const res = await api.get('/properties/');
-      properties = res.data;
-      setLiveProperties(properties);
-    } catch (e) {
-      // Use cached liveProperties
-    }
+      // Prioritize live dynamic database & knowledge base retrieval via backend endpoint
+      const res = await api.post('/widget/chat', {
+        message: textToSend,
+        customer_name: 'Caller',
+        session_id: 'simulator_session'
+      });
 
-    // 1. Check indexed knowledge base for company policies, FAQs, procedures, escrow rules
-    let kbInfo = "";
-    try {
-      const kbRes = await api.post('/knowledge/query', { query: textToSend, top_k: 2 });
-      const results = kbRes.data?.results || [];
-      if (results.length > 0 && results[0].similarity > 0.65) {
-        toolExecuted = `search_knowledge_base(query="${textToSend}")`;
-        setActiveTool(toolExecuted);
-        const topContent = results[0].content.trim();
-        const firstSentence = topContent.split('.')[0] + '.';
-        kbInfo = `According to our company policy, ${firstSentence}`;
+      aiReply = res.data?.reply || "";
+      const action = res.data?.action;
+
+      if (action === "combined_dual_source") {
+        toolExecuted = "search_knowledge_base + search_properties";
+      } else if (action === "search_properties") {
+        toolExecuted = "search_properties(status='available')";
+      } else if (action === "search_knowledge_base") {
+        toolExecuted = "search_knowledge_base(status='verified')";
+      } else if (action === "book_appointment") {
+        toolExecuted = "book_appointment(status='scheduled')";
+      } else if (action === "save_lead") {
+        toolExecuted = "save_lead(status='qualified')";
+      } else if (action === "unavailable_fallback") {
+        toolExecuted = "query_records(status='unavailable')";
       }
+
+      setActiveTool(toolExecuted || null);
     } catch (e) {
-      if (lowerText.includes('escrow') || lowerText.includes('deposit') || lowerText.includes('policy')) {
+      // Offline fallback: Use dynamic properties loaded in state
+      const lowerText = textToSend.toLowerCase();
+      let properties = liveProperties;
+
+      const matchedProperty = properties.find((p) => 
+        lowerText.includes(p.title.toLowerCase()) || 
+        p.title.toLowerCase().includes(lowerText) ||
+        lowerText.includes(p.address.toLowerCase().split(',')[0].toLowerCase())
+      );
+
+      if (matchedProperty) {
+        toolExecuted = `search_properties(query="${matchedProperty.title}")`;
+        setActiveTool(toolExecuted);
+        aiReply = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description} Would you like me to schedule a private tour for you?`;
+      } else if (lowerText.includes('policy') || lowerText.includes('escrow') || lowerText.includes('deposit')) {
         toolExecuted = `search_knowledge_base(topic="escrow_policy")`;
         setActiveTool(toolExecuted);
-        kbInfo = "According to our standard buyer policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
-      }
-    }
-
-    // 2. Check if user is asking about a specific property by title or keyword
-    const matchedProperty = properties.find((p) => 
-      lowerText.includes(p.title.toLowerCase()) || 
-      p.title.toLowerCase().includes(lowerText) ||
-      lowerText.includes(p.address.toLowerCase().split(',')[0].toLowerCase())
-    );
-
-    if (matchedProperty) {
-      toolExecuted = toolExecuted ? `${toolExecuted} + search_properties` : `search_properties(query="${matchedProperty.title}")`;
-      setActiveTool(toolExecuted);
-      const propDetails = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
-      if (kbInfo) {
-        aiReply = `${kbInfo} As for this residence, ${propDetails} Would you like me to schedule a private tour for you?`;
+        aiReply = "According to our company policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
+      } else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('tour') || lowerText.includes('schedule')) {
+        toolExecuted = 'book_appointment(status="confirmed")';
+        setActiveTool(toolExecuted);
+        aiReply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
       } else {
-        aiReply = `${propDetails} Would you like me to schedule a private tour for you?`;
+        aiReply = "Thank you for asking about that. I can assist you with our available properties, company guidelines, or arrange a private viewing tour for you. What would you like to explore?";
       }
-    }
-    // 3. Check if user is asking about bedrooms or specs
-    else if (lowerText.includes('bed') || lowerText.includes('room') || lowerText.includes('bath') || lowerText.includes('spec')) {
-      toolExecuted = toolExecuted ? `${toolExecuted} + search_properties` : `search_properties(filter="bedrooms")`;
-      setActiveTool(toolExecuted);
-      if (properties.length > 0) {
-        const bedCounts = properties.map(p => `${p.title} (${p.bedrooms} beds, ${p.bathrooms} baths)`).join('; ');
-        aiReply = `We currently have residences available across various floor plans: ${bedCounts}. Which one would you like more details on?`;
-      } else {
-        aiReply = `Currently we have several properties listed. How many bedrooms are you seeking?`;
-      }
-      if (kbInfo) {
-        aiReply = `${kbInfo} In addition, ${aiReply}`;
-      }
-    }
-    // 4. Booking appointment request
-    else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('view') || lowerText.includes('schedule') || lowerText.includes('tour')) {
-      toolExecuted = 'book_appointment(date="Tomorrow at 2:00 PM", status="confirmed")';
-      setActiveTool(toolExecuted);
-      aiReply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
-      if (kbInfo) {
-        aiReply = `${kbInfo} Furthermore, ${aiReply}`;
-      }
-    }
-    // 5. General property search / buy / price inquiry
-    else if (lowerText.includes('buy') || lowerText.includes('property') || lowerText.includes('house') || lowerText.includes('villa') || lowerText.includes('penthouse') || lowerText.includes('search') || lowerText.includes('price') || lowerText.includes('cost')) {
-      toolExecuted = toolExecuted ? `${toolExecuted} + search_properties` : `search_properties(limit=3)`;
-      setActiveTool(toolExecuted);
-      if (properties.length > 0) {
-        const featured = properties.slice(0, 3).map(p => `'${p.title}' at ${p.address} ($${p.price.toLocaleString()})`).join(', ');
-        aiReply = `Our current featured residences include ${featured}. Which property would you like to inspect or schedule a viewing for?`;
-      } else {
-        aiReply = "We currently have several residences in our portfolio. How can I assist with your target budget or preferred area?";
-      }
-      if (kbInfo) {
-        aiReply = `${kbInfo} In addition, ${aiReply}`;
-      }
-    }
-    // 6. Contact info / Lead saving
-    else if (lowerText.includes('name') || lowerText.includes('number') || lowerText.includes('contact') || lowerText.includes('lead') || lowerText.includes('phone') || lowerText.includes('email')) {
-      toolExecuted = 'save_lead(status="qualified")';
-      setActiveTool(toolExecuted);
-      aiReply = "Thank you! I have updated your contact details and preferences in our client records. A specialist will follow up with you shortly.";
-    }
-    // 7. Policy / Guideline match only
-    else if (kbInfo) {
-      aiReply = `${kbInfo} Please let me know if you would like more details or if you would like to schedule a private viewing.`;
-    }
-    // Default fallback (conversational and natural)
-    else {
-      aiReply = `Thank you for asking about that. I can assist you with our available properties, pricing specifications, purchasing guidelines, or schedule an in-person viewing tour for you. What would you like to explore?`;
     }
 
     setMessages((prev) => [...prev, { role: 'assistant', text: aiReply, toolCall: toolExecuted }]);

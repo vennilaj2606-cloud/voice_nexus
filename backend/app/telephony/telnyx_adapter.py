@@ -29,7 +29,7 @@ class TelnyxProvider(BaseTelephonyProvider):
         # Telnyx TeXML response to start streaming
         texml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say>Connecting to VoiceNexus AI assistant...</Say>
+    <Say>Connecting to R4R AI assistant...</Say>
     <Connect>
         <Stream url="{ws_url}">
             <Parameter name="call_id" value="{call_id}" />

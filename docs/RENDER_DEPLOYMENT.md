@@ -1,6 +1,6 @@
-# Moving VoiceNexus AI to Render Cloud (onrender.com)
+# Moving R4R AI to Render Cloud (onrender.com)
 
-This guide walks you through moving and hosting the full VoiceNexus AI platform (PostgreSQL + pgvector, FastAPI Backend, Next.js Frontend) on **Render Cloud**.
+This guide walks you through moving and hosting the full R4R AI platform (PostgreSQL + pgvector, FastAPI Backend, Next.js Frontend) on **Render Cloud**.
 
 ---
 
@@ -52,7 +52,7 @@ This guide walks you through moving and hosting the full VoiceNexus AI platform 
 
 ## Method 1: 1-Click Blueprint Deployment (Recommended)
 
-VoiceNexus AI includes a pre-configured `render.yaml` Blueprint file in the root directory.
+R4R AI includes a pre-configured `render.yaml` Blueprint file in the root directory.
 
 ### Step 1: Push Code to your GitHub Repository
 
@@ -76,7 +76,7 @@ git push -u origin main
 
 1. Log into your [Render Dashboard](https://dashboard.render.com).
 2. Click **New +** in the top right, then select **Blueprint**.
-3. Connect your **VoiceNexus AI** GitHub repository.
+3. Connect your **R4R AI** GitHub repository.
 4. Render will read `render.yaml` and show:
    - `voicenexus-postgres` (PostgreSQL 16)
    - `voicenexus-backend` (FastAPI Web Service)
@@ -131,7 +131,7 @@ If you prefer to configure each service manually via the Render UI:
 | Key | Value | Description |
 |---|---|---|
 | `ENVIRONMENT` | `production` | Production environment flag |
-| `PROJECT_NAME` | `VoiceNexus AI` | App name |
+| `PROJECT_NAME` | `R4R AI` | App name |
 | `DATABASE_URL` | *Paste Internal Database URL* | Render automatically handles asyncpg conversion |
 | `SECRET_KEY` | *Generate a random 32+ char key* | JWT secret |
 | `ALLOWED_ORIGINS` | `https://voicenexus-frontend.onrender.com` | Frontend origin allowed by CORS |
@@ -190,7 +190,7 @@ If you prefer to configure each service manually via the Render UI:
 1. **Backend Health Check**:
    Open in browser:
    `https://voicenexus-backend.onrender.com/health`
-   Should return: `{"status":"healthy","service":"VoiceNexus AI","version":"1.0.0","environment":"production"}`
+   Should return: `{"status":"healthy","service":"R4R AI","version":"1.0.0","environment":"production"}`
 
 2. **Interactive API Documentation**:
    Visit:

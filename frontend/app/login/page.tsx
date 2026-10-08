@@ -11,7 +11,7 @@ export default function LoginPage() {
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  
+
   // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -135,7 +135,7 @@ export default function LoginPage() {
             <PhoneCall className="w-8 h-8 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white gradient-text">VoiceNexus AI</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white gradient-text">R4R AI</h1>
             <p className="text-xs text-slate-400 mt-1">Enterprise Voice Assistant SaaS Platform</p>
           </div>
         </div>
@@ -148,11 +148,10 @@ export default function LoginPage() {
               setMode('login');
               setErrorMessage(null);
             }}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              mode === 'login'
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${mode === 'login'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200'
-            }`}
+              }`}
           >
             Sign In
           </button>

@@ -23,7 +23,7 @@ const INDUSTRY_PRESETS = {
   real_estate: {
     name: 'Real Estate Sales Assistant',
     greeting: "Hello! Thank you for calling VoiceNexus Real Estate. My name is Nexus. Are you looking to buy, sell, or view a property today?",
-    systemPrompt: "You are Nexus, an elite, friendly, and professional Real Estate Voice AI Assistant for VoiceNexus AI.\nYour job is to assist callers in finding properties, scheduling property viewings, answering questions about pricing and specs, and capturing lead details."
+    systemPrompt: "You are Nexus, an elite, friendly, and professional Real Estate Voice AI Assistant for R4R AI.\nYour job is to assist callers in finding properties, scheduling property viewings, answering questions about pricing and specs, and capturing lead details."
   },
   restaurant: {
     name: 'Restaurant Reservation Assistant',
@@ -316,11 +316,10 @@ export default function PromptsPage() {
                         setGreeting(p.greeting);
                         setSystemPrompt(p.system_prompt);
                       }}
-                      className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${
-                        activePromptId === p.id
+                      className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${activePromptId === p.id
                           ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 font-medium'
                           : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
+                        }`}
                     >
                       <div className="font-semibold text-slate-200">{p.name}</div>
                       <div className="text-[10px] text-slate-500 capitalize">{p.industry}</div>

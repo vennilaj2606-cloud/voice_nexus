@@ -5,7 +5,7 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "VoiceNexus AI"
+    PROJECT_NAME: str = "R4R AI"
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
     

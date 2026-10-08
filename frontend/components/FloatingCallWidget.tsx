@@ -40,6 +40,9 @@ export default function FloatingCallWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputSpeech, setInputSpeech] = useState('');
   const [liveProperties, setLiveProperties] = useState<Property[]>([]);
+  const [sessionId] = useState(() => `floating_widget_${Date.now()}`);
+  const [activeProperty, setActiveProperty] = useState<Property | null>(null);
+  const [lastOffer, setLastOffer] = useState<string>('greeting');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { speak, stopSpeaking, startListening, stopListening, isListening } = useWebSpeech();
@@ -48,7 +51,8 @@ export default function FloatingCallWidget() {
   const fetchLiveProperties = async () => {
     try {
       const res = await api.get('/properties/');
-      setLiveProperties(res.data);
+      const realProps = (res.data || []).filter((p: Property) => p.price > 0 && !p.title.startsWith('Doc:'));
+      setLiveProperties(realProps);
     } catch (err) {
       console.error('Error fetching live properties for floating widget:', err);
     }
@@ -79,13 +83,14 @@ export default function FloatingCallWidget() {
 
   const handleAnswer = () => {
     setCallState('connected');
-    const initialGreeting = "Hello! Thank you for calling VoiceNexus Real Estate. My name is Priya. How can I help you find your ideal property or book a viewing today?";
+    const initialGreeting = "Hello! Thanks for visiting Apex Realty. My name is Priya, your R4R AI Advisor. How can I help you find your ideal property, check availability, or book a viewing today?";
     setMessages([
       {
         role: 'assistant',
         text: initialGreeting
       }
     ]);
+    setLastOffer('greeting');
 
     if (!isAudioMuted) {
       speak(initialGreeting, 'female');
@@ -112,77 +117,154 @@ export default function FloatingCallWidget() {
     const lowerText = textToSend.toLowerCase();
     let reply = "";
 
-    // 1. Check indexed knowledge base for company policies, FAQs, procedures, escrow rules
-    let kbInfo = "";
     try {
-      const kbRes = await api.post('/knowledge/query', { query: textToSend, top_k: 2 });
-      const results = kbRes.data?.results || [];
-      if (results.length > 0 && results[0].similarity > 0.65) {
-        const topContent = results[0].content.trim();
-        const firstSentence = topContent.split('.')[0] + '.';
-        kbInfo = `According to our company policy, ${firstSentence}`;
+      // Prioritize live dynamic backend dual-source reasoning endpoint with conversation history
+      const historyToSend = messages.slice(-8).map((m) => ({
+        role: m.role,
+        text: m.text
+      }));
+
+      const res = await api.post('/widget/chat', {
+        message: textToSend,
+        customer_name: 'Website Visitor',
+        session_id: sessionId,
+        conversation_history: historyToSend
+      });
+      if (res.data?.reply) {
+        reply = res.data.reply;
+        if (res.data?.properties && res.data.properties.length > 0) {
+          setActiveProperty(res.data.properties[0]);
+        }
       }
-    } catch (e) {
-      // Local fallback for policies if knowledge base is empty
+    } catch (err) {
+      console.warn('API error, using local intelligent intent analysis:', err);
+    }
+
+    if (!reply) {
+      // 1. Check indexed knowledge base for company policies, FAQs, procedures
+      let kbInfo = "";
       if (lowerText.includes('escrow') || lowerText.includes('deposit') || lowerText.includes('policy')) {
-        kbInfo = "According to our standard buyer policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
+        kbInfo = "According to our standard company policy, a 5% escrow deposit is required upon offer acceptance, protected by a 14-day inspection contingency.";
       } else if (lowerText.includes('faq') || lowerText.includes('inspection') || lowerText.includes('procedure')) {
         kbInfo = "Our standard procedures include a comprehensive home inspection and verification before any closing contracts are finalized.";
       }
-    }
 
-    // 2. Check dynamic property listings
-    let properties = liveProperties;
-    try {
-      const res = await api.get('/properties/');
-      properties = res.data;
-      setLiveProperties(properties);
-    } catch (e) {
-      // Use cached liveProperties
-    }
+      // 2. Filter authentic properties
+      const properties = liveProperties.filter(p => p.price > 0 && !p.title.startsWith('Doc:'));
 
-    const matchedProperty = properties.find((p) =>
-      lowerText.includes(p.title.toLowerCase()) ||
-      p.title.toLowerCase().includes(lowerText) ||
-      lowerText.includes(p.address.toLowerCase().split(',')[0].toLowerCase())
-    );
+      // Contextual Affirmation Intent ('yes', 'sure', 'ok')
+      const isAffirmation = ['yes', 'sure', 'ok', 'okay', 'yeah', 'yep', 'yes please', 'please do', 'certainly'].includes(lowerText) || lowerText.startsWith('yes');
+      if (isAffirmation) {
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1].text.toLowerCase() : "";
+        if (lastOffer === 'offer_lead_capture' || lastMsg.includes('representative') || lastMsg.includes('contact details')) {
+          reply = "Certainly! Please share your name and phone number or email, and I will have a senior advisor contact you right away.";
+          setLastOffer('awaiting_contact');
+        } else if (lastOffer === 'offer_tour' || lastMsg.includes('schedule a private') || lastMsg.includes('viewing tour')) {
+          const targetName = activeProperty?.title || 'your selected residence';
+          reply = `Wonderful! I would be delighted to schedule a private viewing tour for you at ${targetName}. What day and time work best for you, or would tomorrow at 2:00 PM suit your schedule?`;
+          setLastOffer('awaiting_tour_time');
+        } else {
+          reply = "Wonderful! Would you like me to share full pricing specifications, check bedroom options, or schedule an in-person viewing tour?";
+          setLastOffer('offer_general');
+        }
+      }
 
-    if (matchedProperty) {
-      const propDetails = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
-      if (kbInfo) {
-        reply = `${kbInfo} As for this residence, ${propDetails} Would you like me to schedule a private tour for you?`;
-      } else {
-        reply = `${propDetails} Would you like me to schedule a private tour for you?`;
+      if (!reply) {
+        // Bedroom filter intent (e.g. '2bed rooms is available', '3 bedrooms')
+        const bedMatch = lowerText.match(/(\d+)\s*(?:bed|bd|bedroom|bedrooms|bed\s*rooms?)/);
+        if (bedMatch) {
+          const targetBeds = parseInt(bedMatch[1], 10);
+          const exactProps = properties.filter(p => p.bedrooms === targetBeds);
+          if (exactProps.length > 0) {
+            const list = exactProps.map(p => `'${p.title}' ($${p.price.toLocaleString()})`).join(', ');
+            reply = `Yes! We currently have ${exactProps.length} residence(s) with ${targetBeds} bedrooms available: ${list}. Would you like me to schedule a private viewing tour?`;
+            setActiveProperty(exactProps[0]);
+          } else {
+            const otherList = properties.slice(0, 3).map(p => `'${p.title}' ($${p.price.toLocaleString()}, ${p.bedrooms} beds)`).join(', ');
+            reply = `We currently do not have ${targetBeds}-bedroom residences in our active listings. Our closest available options feature 3 to 5 bedrooms: ${otherList}. Would you like details on any of these?`;
+          }
+          setLastOffer('offer_tour');
+        }
       }
-    } else if (lowerText.includes('bed') || lowerText.includes('room') || lowerText.includes('bath')) {
-      if (properties.length > 0) {
-        const bedCounts = properties.map(p => `${p.title} (${p.bedrooms} beds, ${p.bathrooms} baths)`).join('; ');
-        reply = `We have residences available ranging across various floor plans: ${bedCounts}. Which of these catches your interest?`;
-      } else {
-        reply = "We have multiple residences available. How many bedrooms are you seeking?";
+
+      if (!reply) {
+        // Check demonstrative reference ('this villa', 'this property', 'it')
+        const isDemonstrative = ['this villa', 'this property', 'this house', 'this home', 'this one', 'it'].some(w => lowerText.includes(w)) || lowerText.startsWith('this ') || lowerText.startsWith('is this ');
+        const isCorrection = ['i ask for', 'i asked for', 'not ', 'i meant', 'i said'].some(w => lowerText.includes(w));
+
+        let matchedProperty = null;
+        if (isCorrection) {
+          matchedProperty = properties.find(p => lowerText.includes(p.title.toLowerCase()) && !lowerText.includes(`not ${p.title.toLowerCase()}`));
+        } else if (isDemonstrative && activeProperty) {
+          matchedProperty = activeProperty;
+        } else {
+          matchedProperty = properties.find((p) =>
+            lowerText.includes(p.title.toLowerCase()) ||
+            p.title.toLowerCase().includes(lowerText) ||
+            lowerText.includes(p.address.toLowerCase().split(',')[0].toLowerCase())
+          ) || activeProperty;
+        }
+
+        const isAvailIntent = lowerText.includes('available') || lowerText.includes('availability') || lowerText.includes('still have') || isCorrection;
+        const isPriceIntent = lowerText.includes('price') || lowerText.includes('cost') || lowerText.includes('how much') || lowerText.includes('rate') || lowerText.includes('pricing');
+        const isLocationIntent = lowerText.includes('where') || lowerText.includes('location') || lowerText.includes('address');
+        const isSpecsIntent = lowerText.includes('bed') || lowerText.includes('room') || lowerText.includes('bath') || lowerText.includes('specs');
+        const isFacilitiesIntent = lowerText.includes('facilit') || lowerText.includes('amenit') || lowerText.includes('feature') || lowerText.includes('pool') || lowerText.includes('gym') || lowerText.includes('garage');
+
+        // Broad Price Details Request ('price details share me')
+        const isBroadPrice = isPriceIntent && (lowerText.includes('share') || lowerText.includes('details') || lowerText.includes('list') || lowerText.includes('all'));
+        if (isBroadPrice) {
+          const pricesStr = properties.slice(0, 5).map(p => `'${p.title}' at $${p.price.toLocaleString()}`).join(', ');
+          reply = `Here are the current prices for our available residences: ${pricesStr}. Which residence fits your budget, or would you like to schedule a private viewing?`;
+          setLastOffer('offer_tour');
+        } else if (isFacilitiesIntent) {
+          if (matchedProperty) {
+            reply = `${matchedProperty.title} features ${matchedProperty.description}. It includes ${matchedProperty.bedrooms} bedrooms and ${matchedProperty.bathrooms} bathrooms. Would you like me to schedule a private viewing tour for you to experience these facilities in person?`;
+            setActiveProperty(matchedProperty);
+          } else {
+            reply = "Our luxury residences feature private infinity pools, smart home automation, floor-to-ceiling panoramic views, private elevators, and gourmet kitchens. Which residence would you like specific facility details for?";
+          }
+          setLastOffer('offer_tour');
+        } else if (matchedProperty) {
+          setActiveProperty(matchedProperty);
+          const prefix = isCorrection ? "I apologize for the confusion! " : "";
+          if (isAvailIntent) {
+            reply = `${prefix}Yes, ${matchedProperty.title} is currently available! It is listed at $${matchedProperty.price.toLocaleString()} (${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms). Would you like me to schedule a private viewing tour for you?`;
+          } else if (isPriceIntent) {
+            reply = `${prefix}${matchedProperty.title} is currently listed at $${matchedProperty.price.toLocaleString()}. Would you like more details or to schedule a private viewing?`;
+          } else if (isLocationIntent) {
+            reply = `${prefix}${matchedProperty.title} is located at ${matchedProperty.address}. Would you like me to arrange an in-person viewing tour for you?`;
+          } else if (isSpecsIntent) {
+            reply = `${prefix}${matchedProperty.title} features ${matchedProperty.bedrooms} bedrooms and ${matchedProperty.bathrooms} bathrooms. Would you like to schedule a private viewing tour?`;
+          } else {
+            const propDetails = `${matchedProperty.title} is located at ${matchedProperty.address}. It features ${matchedProperty.bedrooms} bedrooms, ${matchedProperty.bathrooms} bathrooms, and is listed at $${matchedProperty.price.toLocaleString()}. ${matchedProperty.description}`;
+            reply = `${prefix}${propDetails} Would you like me to schedule a private tour for you?`;
+          }
+          setLastOffer('offer_tour');
+          if (kbInfo) {
+            reply = `${kbInfo} In addition, ${reply}`;
+          }
+        } else if (isAvailIntent) {
+          if (properties.length > 0) {
+            const featured = properties.slice(0, 3).map(p => `'${p.title}' ($${p.price.toLocaleString()})`).join(', ');
+            reply = `Yes, we currently have several residences available: ${featured}. Which one would you like to explore or schedule a viewing for?`;
+          } else {
+            reply = "Yes, we currently have multiple residences available in our portfolio. How can I assist with your preferred neighborhood or budget?";
+          }
+          setLastOffer('offer_tour');
+          if (kbInfo) reply = `${kbInfo} In addition, ${reply}`;
+        } else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('schedule') || lowerText.includes('tour') || lowerText.includes('viewing')) {
+          reply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
+          setLastOffer('appointment_confirmed');
+          if (kbInfo) reply = `${kbInfo} Furthermore, ${reply}`;
+        } else if (kbInfo) {
+          reply = `${kbInfo} Please let me know if you would like more details or if you would like to schedule a private viewing.`;
+          setLastOffer('offer_policy');
+        } else {
+          reply = `I apologize, but that specific information is currently unavailable in our active records. Would you like me to connect you with a representative or take your contact details?`;
+          setLastOffer('offer_lead_capture');
+        }
       }
-      if (kbInfo) {
-        reply = `${kbInfo} In addition, ${reply}`;
-      }
-    } else if (lowerText.includes('book') || lowerText.includes('appointment') || lowerText.includes('schedule') || lowerText.includes('tour') || lowerText.includes('viewing')) {
-      reply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
-      if (kbInfo) {
-        reply = `${kbInfo} Furthermore, ${reply}`;
-      }
-    } else if (lowerText.includes('buy') || lowerText.includes('property') || lowerText.includes('house') || lowerText.includes('price') || lowerText.includes('cost')) {
-      if (properties.length > 0) {
-        const featured = properties.slice(0, 3).map(p => `'${p.title}' ($${p.price.toLocaleString()})`).join(', ');
-        reply = `Our current featured residences include ${featured}. Would you like me to arrange a private viewing for you?`;
-      } else {
-        reply = "We have several residences available. How can I assist with your target budget or preferred area?";
-      }
-      if (kbInfo) {
-        reply = `${kbInfo} In addition, ${reply}`;
-      }
-    } else if (kbInfo) {
-      reply = `${kbInfo} Please let me know if you would like more details or if you would like to schedule a private viewing.`;
-    } else {
-      reply = `Thank you for asking about that. I can assist you with our available properties, pricing specifications, purchasing guidelines, or schedule an in-person viewing tour for you. What would you like to explore today?`;
     }
 
     setMessages((prev) => [...prev, { role: 'assistant', text: reply }]);
@@ -272,7 +354,7 @@ export default function FloatingCallWidget() {
                     <span>Priya</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
                   </h3>
-                  <p className="text-xs text-emerald-100/90 font-medium">VoiceNexus Real Estate Advisor</p>
+                  <p className="text-xs text-emerald-100/90 font-medium">R4R Real Estate Advisor</p>
                 </div>
               </div>
 
@@ -318,7 +400,7 @@ export default function FloatingCallWidget() {
 
                 <div className="space-y-1">
                   <h2 className="text-2xl font-bold text-white tracking-tight">Priya</h2>
-                  <p className="text-xs text-slate-400 font-medium">VoiceNexus Real Estate AI</p>
+                  <p className="text-xs text-slate-400 font-medium">R4R Real Estate AI</p>
                 </div>
 
                 <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">

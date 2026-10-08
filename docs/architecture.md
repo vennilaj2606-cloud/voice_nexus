@@ -1,6 +1,6 @@
-# VoiceNexus AI Architecture & System Specification
+# R4R AI Architecture & System Specification
 
-VoiceNexus AI is an enterprise-grade multi-tenant Voice AI SaaS platform engineered for real-time natural telephone conversations, dynamic database function calling, appointment scheduling, and vector RAG document search.
+R4R AI is an enterprise-grade multi-tenant Voice AI SaaS platform engineered for real-time natural telephone conversations, dynamic database function calling, appointment scheduling, and vector RAG document search.
 
 ---
 

@@ -1,6 +1,6 @@
-# VoiceNexus AI – Production-Ready Voice AI SaaS Platform
+# R4R AI – Production-Ready Voice AI SaaS Platform
 
-VoiceNexus AI is an enterprise-grade, multi-tenant Voice AI SaaS platform designed to handle incoming and outgoing telephone calls, understand natural human speech, respond dynamically using GPT-4, search business data via database function calling, schedule appointments, and perform vector RAG knowledge retrieval.
+R4R AI is an enterprise-grade, multi-tenant Voice AI SaaS platform designed to handle incoming and outgoing telephone calls, understand natural human speech, respond dynamically using GPT-4, search business data via database function calling, schedule appointments, and perform vector RAG knowledge retrieval.
 
 ---
 
@@ -46,7 +46,7 @@ Access the applications:
 
 ### Cloud Deployment (Render)
 
-To deploy VoiceNexus AI to **Render Cloud** in 1 click or manually, follow our detailed [Render Deployment Guide](file:///d:/VoiceNexus%20AI/docs/RENDER_DEPLOYMENT.md). The repository includes a pre-configured `render.yaml` Blueprint.
+To deploy R4R AI to **Render Cloud** in 1 click or manually, follow our detailed [Render Deployment Guide](file:///d:/VoiceNexus%20AI/docs/RENDER_DEPLOYMENT.md). The repository includes a pre-configured `render.yaml` Blueprint.
 
 ---
 

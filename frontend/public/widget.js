@@ -1,5 +1,5 @@
 /**
- * VoiceNexus AI – Embeddable Voice Bot Widget (CDN Script)
+ * R4R AI – Embeddable Voice Bot Widget (CDN Script)
  * Usage in any HTML / PHP / React / WordPress site:
  * 
  * <script 
@@ -36,14 +36,14 @@
       window.VOICENEXUS_API_URL ||
       'http://localhost:8000/api/v1',
     agentName: currentScript?.getAttribute('data-agent-name') || 'Priya',
-    agentTitle: currentScript?.getAttribute('data-agent-title') || 'AI Advisor',
-    company: currentScript?.getAttribute('data-company') || 'VoiceNexus Real Estate',
+    agentTitle: currentScript?.getAttribute('data-agent-title') || 'R4R AI Advisor',
+    company: currentScript?.getAttribute('data-company') || 'R4R Real Estate',
     avatarUrl:
       currentScript?.getAttribute('data-avatar') ||
       (scriptBaseUrl ? `${scriptBaseUrl}/priya_avatar.jpg` : '/priya_avatar.jpg'),
     greeting:
       currentScript?.getAttribute('data-greeting') ||
-      "Hello! Thank you for calling VoiceNexus Real Estate. My name is Priya. How can I help you find your ideal property or book a viewing today?",
+      "Hello! Thanks for visiting Apex Realty. My name is Priya, your R4R AI Advisor. How can I help you find your ideal property, check availability, or book a viewing today?",
     themeColor: currentScript?.getAttribute('data-theme-color') || '#10b981',
   };
 
@@ -56,6 +56,9 @@
   let timerInterval = null;
   let recognition = null;
   let ringInterval = null;
+  const widgetSessionId = 'widget_session_' + Date.now();
+  let activeProperty = null;
+  let lastOffer = 'greeting';
   const messages = [];
 
   // Web Audio Ringtone Generator (no external mp3 file required)
@@ -220,16 +223,28 @@
     let reply = '';
 
     try {
-      // 1. Try sending to VoiceNexus Backend
+      // 1. Try sending to VoiceNexus Backend with conversation history & session ID
+      const historyToSend = messages
+        .filter(m => m.text !== 'Thinking...')
+        .slice(-8)
+        .map(m => ({ role: m.role, text: m.text }));
+
       const res = await fetch(`${CONFIG.apiUrl}/widget/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({
+          message: userText,
+          session_id: widgetSessionId,
+          conversation_history: historyToSend
+        }),
       });
 
       if (res.ok) {
         const data = await res.json();
         reply = data.reply || '';
+        if (data.properties && data.properties.length > 0) {
+          activeProperty = data.properties[0];
+        }
       }
     } catch (err) {
       console.warn('[VoiceNexus Widget] API unavailable, using local intelligent fallback:', err);
@@ -245,19 +260,88 @@
         kbPolicy = "Our procedure requires a certified physical inspection and clear title verification prior to closing.";
       }
 
-      if (lower.includes('bed') || lower.includes('room') || lower.includes('bath')) {
-        reply = "We have 2-bedroom luxury penthouses and 4-bedroom modern villas available. How many bedrooms do you need?";
+      // Check Affirmation Intent ('yes', 'sure', 'ok')
+      const isAffirmation = ['yes', 'sure', 'ok', 'okay', 'yeah', 'yep', 'yes please', 'please do', 'certainly'].includes(lower) || lower.startsWith('yes');
+      if (isAffirmation) {
+        if (lastOffer === 'offer_lead_capture') {
+          reply = "Certainly! Please share your name and phone number or email, and I will have a senior advisor contact you right away.";
+          lastOffer = 'awaiting_contact';
+        } else if (lastOffer === 'offer_tour' || (activeProperty && activeProperty.title)) {
+          const propName = activeProperty?.title || 'the residence';
+          reply = `Wonderful! I would be delighted to schedule a private viewing tour for you at ${propName}. What day and time work best for you, or would tomorrow at 2:00 PM suit your schedule?`;
+          lastOffer = 'awaiting_tour_time';
+        } else {
+          reply = "Wonderful! Would you like me to share full pricing specifications, check bedroom options, or schedule an in-person viewing tour?";
+          lastOffer = 'offer_general';
+        }
+      }
+
+      // Check Bedroom Count Intent (e.g. '2bed rooms is available', '3 bedrooms')
+      const bedMatch = lower.match(/(\d+)\s*(?:bed|bd|bedroom|bedrooms|bed\s*rooms?)/);
+      if (!reply && bedMatch) {
+        const targetBeds = parseInt(bedMatch[1], 10);
+        if (targetBeds === 2) {
+          reply = "We currently do not have 2-bedroom residences in our active listings. Our closest available options feature 3 to 5 bedrooms: Cozy Suburban Family Home ($550,000, 3 beds), Sunset Modern Villa ($1,250,000, 4 beds), and Downtown Luxury Penthouse ($2,100,000, 3 beds). Would you like details on any of these?";
+        } else {
+          reply = `Yes, we have available residences with ${targetBeds} bedrooms including luxury floor plans. Would you like me to share specific pricing or schedule a viewing tour?`;
+        }
+        lastOffer = 'offer_tour';
+      }
+
+      // Check Facilities / Amenities Intent
+      const isFacilities = lower.includes('facilit') || lower.includes('amenit') || lower.includes('feature') || lower.includes('pool') || lower.includes('gym');
+      if (!reply && isFacilities) {
+        if (activeProperty && activeProperty.title) {
+          reply = `${activeProperty.title} features luxury amenities including an infinity pool, smart home integration, and expansive open living spaces. Would you like me to schedule a private viewing tour for you?`;
+        } else {
+          reply = "Our available luxury residences feature private infinity pools, smart home automation, panoramic views, private elevators, and gourmet kitchens. Which residence would you like specific facility details for?";
+        }
+        lastOffer = 'offer_tour';
+      }
+
+      // Check Broad Price Details Request ('price details share me')
+      const isPrice = lower.includes('price') || lower.includes('cost') || lower.includes('how much') || lower.includes('pricing');
+      const isBroadPrice = isPrice && (lower.includes('share') || lower.includes('details') || lower.includes('list') || lower.includes('all'));
+      if (!reply && isBroadPrice) {
+        reply = "Here are the current prices for our available residences: Cozy Suburban Family Home at $550,000, modern villa at $650,000, Sunset Modern Villa at $1,250,000, Highland Luxury Villa at $1,850,000, and Downtown Luxury Penthouse at $2,100,000. Which residence fits your budget, or would you like to schedule a private viewing?";
+        lastOffer = 'offer_tour';
+      // Check Demonstrative ('this villa', 'this property', 'this one', 'it')
+      const isDemonstrative = ['this villa', 'this property', 'this house', 'this home', 'this one', 'it'].some(w => lower.includes(w)) || lower.startsWith('this ') || lower.startsWith('is this ');
+      const isCorrection = ['i ask for', 'i asked for', 'not ', 'i meant', 'i said'].some(w => lower.includes(w));
+
+      if (!reply && (lower.includes('available') || lower.includes('is available') || lower.includes('availability') || isCorrection)) {
+        const prefix = isCorrection ? "I apologize for the confusion! " : "";
+        if (lower.includes('sunset') && !lower.includes('not sunset')) {
+          activeProperty = { title: 'Sunset Modern Villa', price: 1250000 };
+          reply = `${prefix}Yes, Sunset Modern Villa is currently available! It is listed at $1,250,000 in Beverly Hills, featuring 4 bedrooms and 3.5 bathrooms. Would you like me to schedule a private viewing tour for you?`;
+        } else if ((lower.includes('penthouse') || lower.includes('downtown')) && !lower.includes('not penthouse') && !lower.includes('not downtown')) {
+          activeProperty = { title: 'Downtown Luxury Penthouse', price: 2100000 };
+          reply = `${prefix}Yes, Downtown Luxury Penthouse is currently available! It is listed at $2,100,000 in San Francisco, featuring 3 bedrooms and 3 bathrooms. Would you like me to schedule a private viewing tour for you?`;
+        } else if (isDemonstrative && activeProperty && activeProperty.title) {
+          reply = `${prefix}Yes, ${activeProperty.title} is currently available! It is listed at $${(activeProperty.price || 1250000).toLocaleString()}, featuring 4 bedrooms and 3.5 bathrooms. Would you like me to schedule a private viewing tour for you?`;
+        } else {
+          reply = `${prefix}Yes, our luxury residences including Sunset Modern Villa ($1,250,000) and Downtown Luxury Penthouse ($2,100,000) are currently available! Which residence would you like to explore or schedule a viewing for?`;
+        }
+        lastOffer = 'offer_tour';
         if (kbPolicy) reply = `${kbPolicy} In addition, ${reply}`;
-      } else if (lower.includes('book') || lower.includes('appointment') || lower.includes('schedule') || lower.includes('tour') || lower.includes('viewing')) {
+      } else if (!reply && (lower.includes('book') || lower.includes('appointment') || lower.includes('schedule') || lower.includes('tour') || lower.includes('viewing'))) {
         reply = "I have scheduled a private viewing appointment for you tomorrow at 2:00 PM and reserved your time slot.";
+        lastOffer = 'appointment_confirmed';
         if (kbPolicy) reply = `${kbPolicy} Also, ${reply}`;
-      } else if (lower.includes('price') || lower.includes('cost') || lower.includes('property') || lower.includes('house') || lower.includes('buy')) {
-        reply = "Our listings start from $550,000 for suburban family homes up to $2,100,000 for luxury downtown penthouses. Would you like me to book a viewing for you?";
+      } else if (!reply && isPrice) {
+        if (activeProperty) {
+          reply = `${activeProperty.title} is listed at $${(activeProperty.price || 1250000).toLocaleString()}. Would you like to schedule a private viewing tour?`;
+        } else {
+          reply = "Our listings start from $550,000 for suburban family homes up to $2,100,000 for luxury downtown penthouses. Would you like me to book a viewing for you?";
+        }
+        lastOffer = 'offer_tour';
         if (kbPolicy) reply = `${kbPolicy} In addition, ${reply}`;
-      } else if (kbPolicy) {
+      } else if (!reply && kbPolicy) {
         reply = `${kbPolicy} Please let me know if you would like more details or if you would like to arrange a private viewing.`;
-      } else {
-        reply = `Thank you for asking about that. I can assist you with our available properties, pricing specifications, purchasing guidelines, or schedule an in-person viewing tour for you. What would you like to explore?`;
+        lastOffer = 'offer_policy';
+      } else if (!reply) {
+        reply = `I apologize, but that specific information is currently unavailable in our active records. Would you like me to connect you with a representative or take your contact details?`;
+        lastOffer = 'offer_lead_capture';
       }
     }
 
@@ -856,9 +940,8 @@
           </div>
         </div>
 
-        ${
-          callState === 'ringing'
-            ? `
+        ${callState === 'ringing'
+        ? `
           <!-- Ringing Screen -->
           <div class="vn-ringing-screen">
             <div class="vn-ring-avatar-wrap">
@@ -893,7 +976,7 @@
             </div>
           </div>
         `
-            : `
+        : `
           <!-- In-Call Connected Screen -->
           <div class="vn-connected-screen">
             <div class="vn-call-status-bar">
@@ -908,15 +991,14 @@
             <div class="vn-chat-scroll" id="vn-chat-scroll"></div>
 
             <!-- Listening Indicator -->
-            ${
-              isListening
-                ? `
+            ${isListening
+          ? `
               <div class="vn-listening-bar">
                 <span>🔴 Listening to your voice... Speak now!</span>
               </div>
             `
-                : ''
-            }
+          : ''
+        }
 
             <!-- Input Row -->
             <div class="vn-input-row">
@@ -936,7 +1018,7 @@
             </button>
           </div>
         `
-        }
+      }
       </div>
     `;
 
@@ -981,10 +1063,9 @@
       .map(
         (m) => `
         <div class="vn-msg ${m.role === 'assistant' ? 'vn-msg-assistant' : 'vn-msg-user'}">
-          ${
-            m.role === 'assistant'
-              ? `<img src="${CONFIG.avatarUrl}" alt="${CONFIG.agentName}" class="vn-msg-avatar" />`
-              : ''
+          ${m.role === 'assistant'
+            ? `<img src="${CONFIG.avatarUrl}" alt="${CONFIG.agentName}" class="vn-msg-avatar" />`
+            : ''
           }
           <div class="vn-msg-bubble">${m.text}</div>
         </div>

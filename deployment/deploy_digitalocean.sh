@@ -3,7 +3,7 @@
 
 set -e
 
-echo "=== Starting VoiceNexus AI Production Deployment ==="
+echo "=== Starting R4R AI Production Deployment ==="
 
 # 1. Update Ubuntu packages
 sudo apt update && sudo apt upgrade -y

@@ -1,4 +1,4 @@
-name: VoiceNexus AI CI/CD Pipeline
+name: R4R AI CI/CD Pipeline
 
 on:
   push:

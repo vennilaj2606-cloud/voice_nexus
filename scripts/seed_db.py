@@ -7,7 +7,7 @@ from app.core.security import get_password_hash
 from app.prompts.templates import PROMPT_TEMPLATES
 
 async def seed_data():
-    print("Seeding initial VoiceNexus AI demonstration data...")
+    print("Seeding initial R4R AI demonstration data...")
     async with AsyncSessionLocal() as db:
         # Create Demo Organization
         org = Organization(

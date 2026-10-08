@@ -1,12 +1,12 @@
 # ==============================================================================
-# VoiceNexus AI – Render Blueprint Configuration (render.yaml)
+# R4R AI – Render Blueprint Configuration (render.yaml)
 # Deploy PostgreSQL (pgvector), FastAPI Backend, and Next.js Frontend in 1 Click
 # Docs: https://render.com/docs/blueprint-spec
 # ==============================================================================
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. VoiceNexus AI Backend (FastAPI + WebSockets)
+  # 1. R4R AI Backend (FastAPI + WebSockets)
   # ----------------------------------------------------------------------------
   - type: web
     name: voicenexus-backend
@@ -22,7 +22,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: PROJECT_NAME
-        value: "VoiceNexus AI"
+        value: "R4R AI"
       - key: API_V1_STR
         value: "/api/v1"
       - key: SECRET_KEY
@@ -57,7 +57,7 @@ services:
         sync: false
 
   # ----------------------------------------------------------------------------
-  # 2. VoiceNexus AI Frontend (Next.js 14 App Router)
+  # 2. R4R AI Frontend (Next.js 14 App Router)
   # ----------------------------------------------------------------------------
   - type: web
     name: voicenexus-frontend

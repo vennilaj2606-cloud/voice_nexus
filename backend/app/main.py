@@ -31,7 +31,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
-    logger.info("Starting VoiceNexus AI Backend Service...")
+    logger.info("Starting R4R AI Backend Service...")
     await init_db()
 
 @app.get("/health", tags=["Health Check"])

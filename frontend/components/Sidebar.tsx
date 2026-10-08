@@ -3,18 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  PhoneCall, 
-  Radio, 
-  Users, 
-  Building2, 
-  Calendar, 
-  Sparkles, 
-  BookOpen, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  PhoneCall,
+  Radio,
+  Users,
+  Building2,
+  Calendar,
+  Sparkles,
+  BookOpen,
+  BarChart3,
   Settings,
-  LogOut 
+  LogOut
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -56,7 +56,7 @@ export default function Sidebar() {
           <PhoneCall className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="font-bold text-lg tracking-wide gradient-text">VoiceNexus AI</h1>
+          <h1 className="font-bold text-lg tracking-wide gradient-text">R4R AI</h1>
           <p className="text-xs text-slate-400">Enterprise Voice SaaS</p>
         </div>
       </div>
@@ -70,11 +70,10 @@ export default function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                isActive
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
                   ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-md shadow-indigo-500/10'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-              }`}
+                }`}
             >
               <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
               <span>{item.name}</span>
